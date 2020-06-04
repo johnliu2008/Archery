@@ -7,6 +7,8 @@
 """
 
 import re
+import shlex
+
 import redis
 import logging
 import traceback
@@ -22,7 +24,7 @@ logger = logging.getLogger('default')
 
 class RedisEngine(EngineBase):
     def get_connection(self, db_name=None):
-        db_name = db_name or 0
+        db_name = db_name or self.db_name
         return redis.Redis(host=self.host, port=self.port, db=db_name, password=self.password,
                            encoding_errors='ignore', decode_responses=True)
 
@@ -41,7 +43,12 @@ class RedisEngine(EngineBase):
         """
         result = ResultSet(full_sql='CONFIG GET databases')
         conn = self.get_connection()
-        rows = conn.config_get('databases')['databases']
+        try:
+            rows = conn.config_get('databases')['databases']
+        except Exception as e:
+            logger.warning(f"Redis CONFIG GET databases 执行报错，异常信息：{e}")
+            rows = 16
+
         db_list = [str(x) for x in range(int(rows))]
         result.rows = db_list
         return result
@@ -66,7 +73,7 @@ class RedisEngine(EngineBase):
         result_set = ResultSet(full_sql=sql)
         try:
             conn = self.get_connection(db_name=db_name)
-            rows = conn.execute_command(sql)
+            rows = conn.execute_command(*shlex.split(sql))
             result_set.column_list = ['Result']
             if isinstance(rows, list):
                 if re.match(fr'^scan', sql.strip(), re.I):
@@ -122,7 +129,7 @@ class RedisEngine(EngineBase):
             conn = self.get_connection(db_name=workflow.db_name)
             for cmd in split_sql:
                 with FuncTimer() as t:
-                    conn.execute_command(cmd)
+                    conn.execute_command(*shlex.split(cmd))
                 execute_result.rows.append(ReviewResult(
                     id=line,
                     errlevel=0,

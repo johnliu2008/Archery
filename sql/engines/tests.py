@@ -3,6 +3,7 @@ import json
 from datetime import timedelta, datetime
 from unittest.mock import patch, Mock, ANY
 
+import sqlparse
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
@@ -940,16 +941,6 @@ class TestInception(TestCase):
         new_engine.get_backup_connection()
         _connect.assert_called_once()
 
-    def test_execute_check_critical_sql(self):
-        sql = 'alter table user'
-        row = ReviewResult(id=1, errlevel=2, stagestatus='SQL语法错误',
-                           errormessage='ALTER TABLE 必须带有选项',
-                           sql=sql)
-        new_engine = InceptionEngine()
-        check_result = new_engine.execute_check(db_name=0, sql=sql)
-        self.assertIsInstance(check_result, ReviewSet)
-        self.assertEqual(check_result.rows[0].__dict__, row.__dict__)
-
     @patch('sql.engines.inception.InceptionEngine.query')
     def test_execute_check_normal_sql(self, _query):
         sql = 'update user set id=100'
@@ -1379,10 +1370,11 @@ class TestOracle(TestCase):
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.query_check(db_name='archery', sql=sql)
         self.assertDictEqual(check_result,
-                             {'msg': '仅支持^select语法!', 'bad_query': True, 'filtered_sql': sql.strip(';'),
+                             {'msg': '不支持语法!', 'bad_query': True, 'filtered_sql': sql.strip(';'),
                               'has_star': False})
 
-    def test_query_check_star_sql(self):
+    @patch('sql.engines.oracle.OracleEngine.explain_check', return_value={'msg': '', 'rows': 0})
+    def test_query_check_star_sql(self, _explain_check):
         sql = "select * from xx;"
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.query_check(db_name='archery', sql=sql)
@@ -1397,7 +1389,8 @@ class TestOracle(TestCase):
         self.assertDictEqual(check_result,
                              {'msg': '没有有效的SQL语句', 'bad_query': True, 'filtered_sql': sql.strip(), 'has_star': False})
 
-    def test_query_check_plus(self):
+    @patch('sql.engines.oracle.OracleEngine.explain_check', return_value={'msg': '', 'rows': 0})
+    def test_query_check_plus(self, _explain_check):
         sql = "select 100+1 from tb;"
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.query_check(db_name='archery', sql=sql)
@@ -1409,25 +1402,27 @@ class TestOracle(TestCase):
         sql = "select * from xx;"
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.filter_sql(sql=sql, limit_num=100)
-        self.assertEqual(check_result, "select * from xx WHERE ROWNUM <= 100")
+        self.assertEqual(check_result, "select sql_audit.* from (select * from xx) sql_audit where rownum <= 100")
 
     def test_filter_sql_with_delimiter_and_where(self):
         sql = "select * from xx where id>1;"
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.filter_sql(sql=sql, limit_num=100)
-        self.assertEqual(check_result, "select * from xx where id>1 AND ROWNUM <= 100")
+        self.assertEqual(check_result,
+                         "select sql_audit.* from (select * from xx where id>1) sql_audit where rownum <= 100")
 
     def test_filter_sql_without_delimiter(self):
         sql = "select * from xx;"
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.filter_sql(sql=sql, limit_num=100)
-        self.assertEqual(check_result, "select * from xx WHERE ROWNUM <= 100")
+        self.assertEqual(check_result, "select sql_audit.* from (select * from xx) sql_audit where rownum <= 100")
 
     def test_filter_sql_with_limit(self):
         sql = "select * from xx limit 10;"
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.filter_sql(sql=sql, limit_num=1)
-        self.assertEqual(check_result, "select * from xx limit 10 WHERE ROWNUM <= 1")
+        self.assertEqual(check_result,
+                         "select sql_audit.* from (select * from xx limit 10) sql_audit where rownum <= 1")
 
     def test_query_masking(self):
         query_result = ResultSet()
@@ -1440,7 +1435,7 @@ class TestOracle(TestCase):
         row = ReviewResult(id=1, errlevel=2,
                            stagestatus='驳回不支持语句',
                            errormessage='仅支持DML和DDL语句，查询语句请使用SQL查询功能！',
-                           sql=sql)
+                           sql=sqlparse.format(sql, strip_comments=True, reindent=True, keyword_case='lower'))
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.execute_check(db_name='archery', sql=sql)
         self.assertIsInstance(check_result, ReviewSet)
@@ -1453,20 +1448,23 @@ class TestOracle(TestCase):
         row = ReviewResult(id=1, errlevel=2,
                            stagestatus='驳回高危SQL',
                            errormessage='禁止提交匹配' + '^|update' + '条件的语句！',
-                           sql=sql)
+                           sql=sqlparse.format(sql, strip_comments=True, reindent=True, keyword_case='lower'))
         new_engine = OracleEngine(instance=self.ins)
         check_result = new_engine.execute_check(db_name='archery', sql=sql)
         self.assertIsInstance(check_result, ReviewSet)
         self.assertEqual(check_result.rows[0].__dict__, row.__dict__)
 
-    def test_execute_check_normal_sql(self):
+    @patch('sql.engines.oracle.OracleEngine.explain_check', return_value={'msg': '', 'rows': 0})
+    @patch('sql.engines.oracle.OracleEngine.get_sql_first_object_name', return_value='tb')
+    @patch('sql.engines.oracle.OracleEngine.object_name_check', return_value=True)
+    def test_execute_check_normal_sql(self, _explain_check, _get_sql_first_object_name, _object_name_check):
         self.sys_config.purge()
         sql = 'alter table tb set id=1'
         row = ReviewResult(id=1,
-                           errlevel=0,
-                           stagestatus='Audit completed',
-                           errormessage='None',
-                           sql=sql,
+                           errlevel=1,
+                           stagestatus='当前平台，此语法不支持审核！',
+                           errormessage='当前平台，此语法不支持审核！',
+                           sql=sqlparse.format(sql, strip_comments=True, reindent=True, keyword_case='lower'),
                            affected_rows=0,
                            execute_time=0,
                            stmt_type='SQL',
@@ -1577,11 +1575,11 @@ class MongoTest(TestCase):
     @patch('sql.engines.mongo.MongoEngine.get_connection')
     def test_query(self, mock_get_connection):
         # TODO 正常查询还没做
-        test_sql = 'test.find({"id":{"$gt":1.0}})'
-        self.assertIsInstance(self.engine.query(test_sql), ResultSet)
+        test_sql = """{"collection": "job","count": true}"""
+        self.assertIsInstance(self.engine.query('archery', test_sql), ResultSet)
 
     def test_query_check(self):
-        test_sql = 'test.find({"id":{"$gt":1.0}})'
+        test_sql = """{"collection": "job","count": true}"""
         check_result = self.engine.query_check(sql=test_sql)
         self.assertEqual(False, check_result.get('bad_query'))
 
