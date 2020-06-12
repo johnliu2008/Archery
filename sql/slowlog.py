@@ -12,10 +12,11 @@ from common.utils.chart_dao import ChartDao
 
 from sql.utils.resource_group import user_instances
 from common.utils.extend_json_encoder import ExtendJSONEncoder
-from .models import Instance, SlowQuery, SlowQueryHistory, AliyunRdsConfig
+from .models import Instance, SlowQuery, SlowQueryHistory, AliyunRdsConfig, TcloudCdbConfig
 
 from .aliyun_rds import slowquery_review as aliyun_rds_slowquery_review, \
     slowquery_review_history as aliyun_rds_slowquery_review_history
+from .tcloud import slowquery_review as cdb_slowquery_review, slowquery_review_history as cdb_slowquery_review_history
 
 import logging
 
@@ -38,6 +39,9 @@ def slowquery_review(request):
     if AliyunRdsConfig.objects.filter(instance=instance_info, is_enable=True).exists():
         # 调用阿里云慢日志接口
         result = aliyun_rds_slowquery_review(request)
+    elif TcloudCdbConfig.objects.filter(instance=instance_info, is_enable=True).exists():
+        # 调用腾讯云慢日志接口
+        result = cdb_slowquery_review(request)
     else:
         start_time = request.POST.get('StartTime')
         end_time = request.POST.get('EndTime')
@@ -113,6 +117,9 @@ def slowquery_review_history(request):
     if AliyunRdsConfig.objects.filter(instance=instance_info, is_enable=True).exists():
         # 调用阿里云慢日志接口
         result = aliyun_rds_slowquery_review_history(request)
+    elif TcloudCdbConfig.objects.filter(instance=instance_info, is_enable=True).exists():
+        # 调用腾讯云慢日志接口
+        result = cdb_slowquery_review_history(request)
     else:
         start_time = request.POST.get('StartTime')
         end_time = request.POST.get('EndTime')

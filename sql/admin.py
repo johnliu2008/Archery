@@ -6,7 +6,7 @@ from django.contrib.auth.admin import UserAdmin
 from .models import Users, Instance, SqlWorkflow, SqlWorkflowContent, QueryLog, DataMaskingColumns, DataMaskingRules, \
     AliyunRdsConfig, CloudAccessKey, ResourceGroup, QueryPrivilegesApply, \
     QueryPrivileges, InstanceAccount, InstanceDatabase, ArchiveConfig, \
-    WorkflowAudit, WorkflowLog, ParamTemplate, ParamHistory, InstanceTag
+    WorkflowAudit, WorkflowLog, ParamTemplate, ParamHistory, InstanceTag, TcloudCdbConfig
 
 
 # 用户管理
@@ -65,10 +65,14 @@ class InstanceAdmin(admin.ModelAdmin):
     class AliRdsConfigInline(admin.TabularInline):
         model = AliyunRdsConfig
 
+    # 腾讯云实例关系配置
+    class TcloudCdbConfigInline(admin.TabularInline):
+        model = TcloudCdbConfig
+
     # 实例资源组关联配置
     filter_horizontal = ('resource_group', 'instance_tag',)
 
-    inlines = [AliRdsConfigInline]
+    inlines = [AliRdsConfigInline, TcloudCdbConfigInline]
 
 
 # SQL工单内容
