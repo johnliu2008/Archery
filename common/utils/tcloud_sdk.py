@@ -9,6 +9,8 @@ from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentClo
 from tencentcloud.dcdb.v20180411 import dcdb_client, models as dcdb_models
 from tencentcloud.cdb.v20170320 import cdb_client, models as cdb_models
 from tencentcloud.dbbrain.v20191016 import dbbrain_client, models as dbbrain_models
+from tencentcloud.sqlserver.v20180328 import sqlserver_client, models as sqlserver_models
+from tencentcloud.mongodb.v20190725 import mongodb_client, models as mongodb_models
 import logging
 
 logger = logging.getLogger('default')
@@ -42,7 +44,7 @@ class Tcloud(object):
             params = '{}'
             req.from_json_string(params)
             resp = client.DescribeDCDBInstances(req)
-            return resp
+            return resp.to_json_string()
 
         except TencentCloudSDKException as err:
             raise Exception(f'腾讯云获取DCDB实例列表失败：{err}{traceback.format_exc()}')
@@ -62,7 +64,7 @@ class Tcloud(object):
             params = '{\"InstanceId\":\"%s\"}' % self.DBInstanceId
             req.from_json_string(params)
             resp = client.DescribeDCDBShards(req)
-            return resp
+            return resp.to_json_string()
 
         except TencentCloudSDKException as err:
             raise Exception(f'腾讯云获取DCDB分片列表失败：{err}{traceback.format_exc()}')
@@ -92,7 +94,7 @@ class Tcloud(object):
                      (self.DBInstanceId, shard_instance_id, file_type)
             req.from_json_string(params)
             resp = client.DescribeDBLogFiles(req)
-            return resp
+            return resp.to_json_string()
 
 
         except TencentCloudSDKException as err:
@@ -116,7 +118,7 @@ class Tcloud(object):
             req.from_json_string(params)
 
             resp = client.DescribeBackups(req)
-            return resp
+            return resp.to_json_string()
 
         except TencentCloudSDKException as err:
             raise Exception(f'腾讯云获取CDB备份文件失败：{err}{traceback.format_exc()}')
@@ -174,3 +176,76 @@ class Tcloud(object):
 
         except TencentCloudSDKException as err:
             raise Exception(f'腾讯云获取CDB慢日志详情失败：{err}{traceback.format_exc()}')
+
+    def getMSSqlBackupFiles(self, startTime=None, endTime=None, limit=None, offset=None):
+        '''
+        获取MSSQL的备份文件列表
+        https://console.cloud.tencent.com/api/explorer?Product=sqlserver&Version=2018-03-28&Action=DescribeBackups&SignVersion=
+        '''
+        try:
+            httpProfile = HttpProfile()
+            httpProfile.endpoint = "sqlserver.tencentcloudapi.com"
+
+            clientProfile = ClientProfile()
+            clientProfile.httpProfile = httpProfile
+            client = sqlserver_client.SqlserverClient(self.clt, self.region, clientProfile)
+
+            req = sqlserver_models.DescribeBackupsRequest()
+            params = '{\"InstanceId\":\"%s\",\"StartTime\":\"%s\",\"EndTime\":\"%s\",\"Limit\":%d,\"Offset\":%d}' %\
+                     (self.DBInstanceId, startTime, endTime, limit, offset)
+            req.from_json_string(params)
+
+            resp = client.DescribeBackups(req)
+            return resp.to_json_string()
+
+        except TencentCloudSDKException as err:
+            raise Exception(f'腾讯云获取MS SQL备份文件失败：{err}{traceback.format_exc()}')
+
+    def getMongoDBBackups(self):
+        '''
+        获取MongoDB的备份列表
+        https://console.cloud.tencent.com/api/explorer?Product=mongodb&Version=2019-07-25&Action=DescribeDBBackups&SignVersion=
+        https://console.cloud.tencent.com/api/explorer?Product=mongodb&Version=2019-07-25&Action=DescribeBackupAccess&SignVersion=
+        TODO 暂不确定分片集群与复制集的备份查询方式是否有差异
+        '''
+        try:
+            httpProfile = HttpProfile()
+            httpProfile.endpoint = "mongodb.tencentcloudapi.com"
+
+            clientProfile = ClientProfile()
+            clientProfile.httpProfile = httpProfile
+            client = mongodb_client.MongodbClient(self.clt, self.region, clientProfile)
+
+            req = mongodb_models.DescribeDBBackupsRequest()
+            params = '{\"InstanceId\":\"%s\"}' % self.DBInstanceId
+            req.from_json_string(params)
+            resp = client.DescribeDBBackups(req)
+            return resp.to_json_string()
+
+
+        except TencentCloudSDKException as err:
+            raise Exception(f'腾讯云获取MongoDB备份列表失败：{err}{traceback.format_exc()}')
+
+    def getMongoDBBackupAccess(self, backupName=None):
+        '''
+        获取MongoDB的备份文件列表
+        https://console.cloud.tencent.com/api/explorer?Product=mongodb&Version=2019-07-25&Action=DescribeBackupAccess&SignVersion=
+        '''
+        try:
+            httpProfile = HttpProfile()
+            httpProfile.endpoint = "mongodb.tencentcloudapi.com"
+
+            clientProfile = ClientProfile()
+            clientProfile.httpProfile = httpProfile
+            client = mongodb_client.MongodbClient(self.clt, self.region, clientProfile)
+
+            req = mongodb_models.DescribeBackupAccessRequest()
+            params = '{\"InstanceId\":\"%s\",\"BackupName\":\"%s\"}' \
+                     % (self.DBInstanceId, backupName)
+            req.from_json_string(params)
+            resp = client.DescribeBackupAccess(req)
+            return resp.to_json_string()
+
+
+        except TencentCloudSDKException as err:
+            raise Exception(f'腾讯云获取MongoDB备份文件失败：{err}{traceback.format_exc()}')

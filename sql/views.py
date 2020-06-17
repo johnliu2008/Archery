@@ -425,3 +425,9 @@ def dbaprinciples(request):
     with open(file, 'r') as f:
         md = f.read().replace('\n', '\\n')
     return render(request, 'dbaprinciples.html', {'md': md})
+
+
+@permission_required('sql.menu_backupcheck', raise_exception=True)
+def backupcheck(request):
+    """备份检查页面"""
+    return render(request, 'backupcheck.html')

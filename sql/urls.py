@@ -8,7 +8,7 @@ import sql.query_privileges
 import sql.sql_optimize
 from common import auth, config, workflow, dashboard, check
 from sql import views, sql_workflow, sql_analyze, query, slowlog, instance, instance_account, db_diagnostic, \
-    resource_group, binlog, data_dictionary, archiver
+    resource_group, binlog, data_dictionary, archiver, backup
 from sql.utils import tasks
 from common.utils import ding_api
 
@@ -147,6 +147,9 @@ urlpatterns = [
     path('archive/switch/', archiver.archive_switch),
     path('archive/once/', archiver.archive_once),
     path('archive/log/', archiver.archive_log),
+
+    path('backupcheck/', views.backupcheck),
+    path('backupcheck/check/', backup.backup_check),
 
     path('4admin/sync_ding_user/', ding_api.sync_ding_user)
 ]

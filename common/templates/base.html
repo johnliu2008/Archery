@@ -236,6 +236,11 @@
                             <!-- /.nav-second-level -->
                         </li>
                     {% endif %}
+                    {% if perms.sql.menu_backup %}
+                        <li>
+                            <a href="/backupcheck/"><i class="fa fa-file-archive-o fa-fw"></i> 备份检查</a>
+                        </li>
+                    {% endif %}
                     {% if perms.sql.menu_document %}
                         <li>
                             <a href="/dbaprinciples/"><i class="fa fa-sitemap fa-fw"></i> 相关文档</a>
