@@ -859,14 +859,16 @@ class TcloudCdbConfig(models.Model):
     """
     腾讯云cdb和dcdb配置信息
     """
-    region_choices = (('ap-shanghai', '华东地区(上海)'), ('ap-chengdu', '西南地区(成都)'), ('ap-chongqing', '西南地区(重庆)'),
+    region_choices = ((None, '-'*10), ('ap-shanghai', '华东地区(上海)'), ('ap-chengdu', '西南地区(成都)'),
+                      ('ap-chongqing', '西南地区(重庆)'),
                       ('ap-guangzhou', '华南地区(广州)'), ('ap-hongkong', '港澳台地区(中国香港)'),
                       ('ap-nanjing', '华东地区(南京)'),
                       ('ap-beijing', '华北地区(北京)'), ('ap-shanghai-fsi', '华东地区(上海金融)'),
                       ('ap-shenzhen-fsi', '华南地区(深圳金融)'), ('ap-singapore', '亚太东南(新加坡)'),
                       ('ap-tokyo', '亚太东北(东京)'), ('na-ashburn', '美国东部(弗吉尼亚)'),
                       ('na-siliconvalley', '美国西部(硅谷)'), ('na-toronto', '北美地区(多伦多)'))
-    prd_choices = (('CDB', 'CDB'), ('DCDB', 'DCDB/TDSQL'), ('MONGO', 'MongoDB'), ('MSSQL', 'MS SQLserver'),
+    prd_choices = ((None, '-'*10), ('CDB', 'CDB'), ('DCDB', 'DCDB/TDSQL'), ('MONGO', 'MongoDB'),
+                   ('MSSQL', 'MS SQLserver'),
                    ('REDIS', 'REDIS'))
     instance = models.OneToOneField(Instance, on_delete=models.CASCADE)
     cdb_dbinstanceid = models.CharField('对应腾讯云cdb和dcdb实例ID', max_length=100)
