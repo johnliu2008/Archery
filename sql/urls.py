@@ -148,8 +148,12 @@ urlpatterns = [
     path('archive/once/', archiver.archive_once),
     path('archive/log/', archiver.archive_log),
 
+    path('create_backup/', views.create_backup),
     path('backupcheck/', views.backupcheck),
     path('backupcheck/check/', backup.backup_check),
+    path('backupcheck/download/', backup.download2local),
+    path('backupcheck/start_backup/', backup.start_backup),
+    path('backupcheck/start_group_backup/', backup.start_group_backup),
 
     path('4admin/sync_ding_user/', ding_api.sync_ding_user)
 ]

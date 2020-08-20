@@ -172,8 +172,8 @@ def backup_check(request):
             FileName = item['Name']
             StartTime = item['StartTime']
             FinishTime = item['FinishTime']
-            Size = item['Size']
-            Size = bytes2human(Size)
+            Bytes = item['Size']
+            Size = bytes2human(Bytes)
             Type = item['Type']
             Way = item['Way']
             Method = item['Method']
@@ -181,7 +181,7 @@ def backup_check(request):
             Url = item['InternetUrl']
             rows.append({'Date': Date, 'FileName': FileName, 'StartTime': StartTime, 'FinishTime': FinishTime, 'Size': Size,
                          'Type': typeDict[Type], 'Way': wayDict[Way], 'Method': methodDict[Method],
-                         'Status': statusDict[Status], 'Url': Url})
+                         'Status': statusDict[Status], 'Url': Url, 'Bytes': Bytes})
         result = {"total": backupfiles['TotalCount'], "rows": rows}
     elif instance_info.instance_type == 'DCDB':
         shards = Tcloud(cdb=instance_info).getDcdbShards()
@@ -196,8 +196,8 @@ def backup_check(request):
                 FileName = file['FileName']
                 StartTime = 'N/A'
                 FinishTime = 'N/A'
-                Size = file['Length']
-                Size = bytes2human(Size)
+                Bytes = file['Length']
+                Size = bytes2human(Bytes)
                 Type = 'physical'
                 Way = 'automatic'
                 Method = 'full'
@@ -206,7 +206,8 @@ def backup_check(request):
                 rows.append(
                     {'Date': Date, 'FileName': ShardInstanceId + ': ' + FileName, 'StartTime': StartTime,
                      'FinishTime': FinishTime, 'Size': Size, 'Type': typeDict[Type], 'Way': wayDict[Way],
-                     'Method': methodDict[Method], 'Status': statusDict[Status], 'Url': download_prefix + Url})
+                     'Method': methodDict[Method], 'Status': statusDict[Status], 'Url': download_prefix + Url,
+                     'Bytes': Bytes})
         result = {"total": len(rows), "rows": rows}
     elif instance_info.instance_type == 'MSSQL':
         startTime = '%s 00:00:00' % request.POST.get('StartTime')
@@ -224,8 +225,8 @@ def backup_check(request):
             FileName = backups['FileName']
             StartTime = backups['StartTime']
             FinishTime = backups['EndTime']
-            Size = backups['Size'] * 1024 # SQLserver这个值的单位是KB，所以转换成Bytes，与其它API保持统一
-            Size = bytes2human(Size)
+            Bytes = backups['Size'] * 1024 # SQLserver这个值的单位是KB，所以转换成Bytes，与其它API保持统一
+            Size = bytes2human(Bytes)
             Type = 'N/A'
             Way = backups['BackupWay']
             strategy = backups['Strategy']
@@ -237,7 +238,7 @@ def backup_check(request):
                 {'Date': Date, 'FileName': FileName, 'StartTime': StartTime, 'FinishTime': FinishTime, 'Size': Size,
                  'Type': Type, 'Way': backupWayDict[Way], 'Method': strategyDict[strategy],
                  'Status': statusDict[Status], 'Url': Url, 'InternalAddr': InternalAddr, 'ExternalAddr': Url,
-                 'DBs': DBs})
+                 'DBs': DBs, 'Bytes': Bytes})
         result = {"total": backupfiles['TotalCount'], "rows": rows}
     elif instance_info.instance_type == 'MONGO':
         backups = Tcloud(cdb=instance_info).getMongoDBBackups()
@@ -252,8 +253,8 @@ def backup_check(request):
             StartTime = backup['StartTime']
             EndTime = backup['EndTime']
             BackupMethod = backup['BackupMethod']
-            BackupSize = backup['BackupSize']  # 文档说这个返回值的单位是KB，实际测试发现是bytes
-            BackupSize = bytes2human(BackupSize)
+            Bytes = backup['BackupSize']  # 文档说这个返回值的单位是KB，实际测试发现是bytes
+            BackupSize = bytes2human(Bytes)
             BackupType = backup['BackupType']
             Status = backup['Status']
             Date = StartTime
@@ -272,11 +273,62 @@ def backup_check(request):
                 {'Date': Date, 'FileName': backupName, 'StartTime': StartTime, 'FinishTime': EndTime,
                  'Size': BackupSize, 'Type': BackupMethodDict[BackupMethod], 'Way': BackupTypeDict[BackupType],
                  'Method': BackupDesc, 'Status': StatusDict[Status], 'Url': Url, 'ReplicateSetId': ReplicateSetId,
-                 'coscmd_info': {'Bucket': Bucket, 'Region': Region, 'File': File}})
+                 'coscmd_info': {'Bucket': Bucket, 'Region': Region, 'File': File}, 'Bytes': Bytes})
         result = {"total": len(rows), "rows": rows, 'msg': '只能通过coscmd工具下载'}
+    elif instance_info.instance_type == 'REDIS':
+        startTime = '%s 00:00:00' % request.POST.get('StartTime')
+        endTime = '%s 23:59:59' % request.POST.get('EndTime')
+        limit = request.POST.get('limit')
+        offset = request.POST.get('offset')
+        backups = Tcloud(cdb=instance_info).getRedisBackupList(BeginTime=startTime, EndTime=endTime, Limit=limit, Offset=offset)
+        backups = json.loads(backups)
+        BackupTypeDict = {'0': '手动备份', '1': '自动备份'}
+        StatusDict = {1: '备份被其它流程锁定', 2: '备份成功', -1:"备份已过期", 3:"备份正在被导出", 4:"备份导出成功"}
+        totalCount = backups['TotalCount']
+        for backup in backups["BackupSet"]:
+            if backup['Locked'] == 0:
+                BackupId = backup['BackupId']
+                BackupType = backup['BackupType']
+                Remark = backup['Remark']
+                StartTime = backup['StartTime']
+                Status = backup['Status']
+                Url = json.loads(Tcloud(cdb=instance_info).getRedisBackupURL(BackupId=BackupId))['InnerDownloadUrl']
+                rows.append(
+                    {'Date': StartTime, 'FileName': BackupId, 'StartTime': StartTime, 'FinishTime': '',
+                     'Size': 0, 'Type': '物理备份', 'Way': BackupTypeDict[BackupType], 'Bytes': 0,
+                     'Method': Remark, 'Status': StatusDict[Status], 'Url': Url,
+                     'originnal_info': backup})
+        result = {"total": totalCount, "rows": rows}
     else:
-        result = {"total": 0, "rows": [], 'msg': '目前只支持检查腾讯云CDB,DCDB,MSSQL,MongoDB的备份', 'status': 1}
+        result = {"total": 0, "rows": [], 'msg': '目前只支持检查腾讯云CDB,DCDB,MSSQL,MongoDB,Redis的备份', 'status': 1}
     # 返回查询结果
     return result
 
+def create_backup(request, instance_id=None):
+    if instance_id is None:
+        instance_id = request.POST.get('instance_id')
+    title = request.POST.get('title')
 
+
+    # 通过实例名称获取关联的rds实例id
+    instance_info = TcloudCdbConfig.objects.get(instance__id=instance_id)
+    # 调用腾讯云接口获取SQL慢日志统计，根据DCDB或CDB调用不同的API
+    if instance_info.instance_type == 'CDB':
+        result = Tcloud(cdb=instance_info).createCDBbackup('physical')
+        result = json.loads(result)
+    elif instance_info.instance_type == 'MSSQL':
+        result = Tcloud(cdb=instance_info).createMSSQLbackup(0)
+        result = json.loads(result)
+    elif instance_info.instance_type == 'MONGO':
+        result = Tcloud(cdb=instance_info).createMongoDBbackup(0)
+        result = json.loads(result)
+    elif instance_info.instance_type == 'REDIS':
+        result = Tcloud(cdb=instance_info).createRedisDBbackup()
+        result = json.loads(result)
+        result['status'] = 0
+    else:
+        result = {'status': 1, 'msg': '暂不支持此实例类型'}
+
+    if 'status' not in result:
+        result['status'] = 0
+    return result

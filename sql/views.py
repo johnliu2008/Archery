@@ -430,4 +430,18 @@ def dbaprinciples(request):
 @permission_required('sql.menu_backupcheck', raise_exception=True)
 def backupcheck(request):
     """备份检查页面"""
-    return render(request, 'backupcheck.html')
+    user = request.user
+    # 获取组信息
+    group_list = user_groups(user)
+    context = {'group_list': group_list}
+    return render(request, 'backupcheck.html', context)
+
+@permission_required('sql.menu_backupcheck', raise_exception=True)
+def create_backup(request):
+    """创建腾讯云数据库的备份"""
+    user = request.user
+    # 获取组信息
+    group_list = user_groups(user)
+    tags = InstanceTag.objects.all()
+    context = {'group_list': group_list, 'tags': tags}
+    return render(request, 'create_backup.html', context)
