@@ -23,8 +23,11 @@ def lists(request):
     type = request.POST.get('type')
     db_type = request.POST.get('db_type')
     tags = request.POST.getlist('tags[]')
+    group = request.POST.get('group')
     limit = offset + limit
     search = request.POST.get('search', '')
+    is_cdb = request.POST.get('is_cdb', '')
+
 
     # 组合筛选项
     filter_dict = dict()
@@ -43,9 +46,14 @@ def lists(request):
     if tags:
         for tag in tags:
             instances = instances.filter(instance_tag=tag, instance_tag__active=True)
+    if group:
+        instances = instances.filter(resource_group=group, resource_group__is_deleted=0)
+    if is_cdb:
+        instances = instances.filter(tcloudcdbconfig__is_enable=True)
 
     count = instances.count()
     instances = instances[offset:limit].values("id", "instance_name", "db_type", "type", "host", "port", "user")
+    # instances = instances[offset:limit].values("id", "instance_name", "db_type", "type", "host", "port", "user", "resource_group", "instance_tag")
     # QuerySet 序列化
     rows = [row for row in instances]
 
